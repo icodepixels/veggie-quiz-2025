@@ -1,0 +1,26 @@
+2025-03-28 11:24:55.738 MDT [77428] LOG:  starting PostgreSQL 17.4 (Postgres.app) on aarch64-apple-darwin23.6.0, compiled by Apple clang version 15.0.0 (clang-1500.3.9.4), 64-bit
+2025-03-28 11:24:55.740 MDT [77428] LOG:  listening on IPv6 address "::1", port 5430
+2025-03-28 11:24:55.740 MDT [77428] LOG:  listening on IPv4 address "127.0.0.1", port 5430
+2025-03-28 11:24:55.741 MDT [77428] LOG:  listening on Unix socket "/tmp/.s.PGSQL.5430"
+2025-03-28 11:24:55.743 MDT [77431] LOG:  database system was shut down at 2025-03-28 11:24:55 MDT
+2025-03-28 11:24:55.746 MDT [77428] LOG:  database system is ready to accept connections
+2025-03-28 11:29:55.744 MDT [77429] LOG:  checkpoint starting: time
+2025-03-28 11:30:58.578 PostgresPermissionDialog[80248:14873014] +[IMKClient subclass]: chose IMKClient_Modern
+2025-03-28 11:30:58.578 PostgresPermissionDialog[80248:14873014] +[IMKInputSession subclass]: chose IMKInputSession_Modern
+2025-03-28 11:31:35.353 MDT [77429] LOG:  checkpoint complete: wrote 987 buffers (6.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=99.595 s, sync=0.011 s, total=99.609 s; sync files=317, longest=0.002 s, average=0.001 s; distance=4640 kB, estimate=4640 kB; lsn=0/1BD90B8, redo lsn=0/1BD8EC0
+2025-03-28 11:39:30.441 PostgresPermissionDialog[84296:14889959] +[IMKClient subclass]: chose IMKClient_Modern
+2025-03-28 11:39:30.441 PostgresPermissionDialog[84296:14889959] +[IMKInputSession subclass]: chose IMKInputSession_Modern
+2025-03-28 11:39:34.454 MDT [84295] FATAL:  database "veggie-quiz" does not exist
+" does not exist
+2025-03-28 11:41:40.035 MDT [85308] FATAL:  database "veggie-quiz" does not exist
+2025-03-28 11:42:30.291 MDT [85717] FATAL:  database "veggie-quiz" does not exist
+2025-03-28 11:44:21.459 MDT [86695] FATAL:  database "veggie-quiz" does not exist
+2025-03-28 11:45:10.937 MDT [77428] LOG:  received fast shutdown request
+2025-03-28 11:45:10.937 MDT [77428] LOG:  aborting any active transactions
+2025-03-28 11:45:10.937 MDT [80361] FATAL:  terminating connection due to administrator command
+2025-03-28 11:45:10.937 MDT [80247] FATAL:  terminating connection due to administrator command
+2025-03-28 11:45:10.939 MDT [77428] LOG:  background worker "logical replication launcher" (PID 77434) exited with exit code 1
+2025-03-28 11:45:10.939 MDT [77429] LOG:  shutting down
+2025-03-28 11:45:10.940 MDT [77429] LOG:  checkpoint starting: shutdown immediate
+2025-03-28 11:45:10.942 MDT [77429] LOG:  checkpoint complete: wrote 1 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.001 s, sync=0.001 s, total=0.003 s; sync files=1, longest=0.001 s, average=0.001 s; distance=0 kB, estimate=4176 kB; lsn=0/1BD9168, redo lsn=0/1BD9168
+2025-03-28 11:45:10.944 MDT [77428] LOG:  database system is shut down

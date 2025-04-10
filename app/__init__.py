@@ -1,0 +1,3 @@
+"""
+Veggie Quiz API package.
+"""
