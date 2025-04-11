@@ -11,10 +11,14 @@ export default function QuizPage() {
   const quizId = parseInt(params.id as string);
   const dispatch = useDispatch<AppDispatch>();
   const { currentQuiz, loading, error } = useSelector((state: RootState) => state.quizzes);
+  const { token } = useSelector((state: RootState) => state.auth);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [score, setScore] = useState(0);
   const [showResults, setShowResults] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (quizId) {
@@ -27,15 +31,165 @@ export default function QuizPage() {
   };
 
   const handleNextQuestion = () => {
-    if (selectedAnswer === currentQuiz?.questions[currentQuestionIndex].correct_answer_index) {
+    if (!currentQuiz) {
+      setSaveError('Quiz information not available');
+      return;
+    }
+
+    if (selectedAnswer === currentQuiz.questions[currentQuestionIndex].correct_answer_index) {
       setScore(score + 1);
     }
 
-    if (currentQuestionIndex < (currentQuiz?.questions.length || 0) - 1) {
+    if (currentQuestionIndex < currentQuiz.questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
     } else {
+      // Calculate final score including the last question
+      const finalScore = score + (selectedAnswer === currentQuiz.questions[currentQuestionIndex].correct_answer_index ? 1 : 0);
+      setScore(finalScore);
       setShowResults(true);
+
+      // Save results to database if user is authenticated
+      if (token && currentQuiz) {
+        saveQuizResult(finalScore, currentQuiz.questions.length);
+      }
+    }
+  };
+
+  const saveQuizResult = async (finalScore: number, totalQuestions: number) => {
+    try {
+      setIsSaving(true);
+      setSaveStatus('idle');
+      setSaveError(null);
+
+      if (!token) {
+        console.error('No token available for API request');
+        setSaveError('You must be logged in to save your results');
+        setIsSaving(false);
+        return;
+      }
+
+      if (!currentQuiz) {
+        setSaveError('Quiz information not available');
+        setIsSaving(false);
+        return;
+      }
+
+      // Calculate score percentage
+      const scorePercentage = (finalScore / totalQuestions) * 100;
+
+      console.log('Saving quiz result:', {
+        quiz_id: currentQuiz.id,
+        score: scorePercentage,
+        correct_answers: finalScore,
+        total_questions: totalQuestions
+      });
+
+      // Use fallback URL if NEXT_PUBLIC_API_URL is not defined
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      console.log('Using API URL:', apiUrl);
+
+      // Correct endpoint from backend code: /api/quizzes/user-results
+      const endpoint = '/api/quizzes/user-results';
+      console.log('Making request to:', `${apiUrl}${endpoint}`);
+
+      // Prepare request payload
+      const payload = {
+        quiz_id: currentQuiz.id,
+        score: scorePercentage,
+        correct_answers: finalScore,
+        total_questions: totalQuestions
+      };
+
+      console.log('Request payload:', payload);
+      console.log('Request headers:', {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer [TOKEN HIDDEN]'
+      });
+
+      // Send result to API
+      const response = await fetch(`${apiUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload),
+        credentials: 'include'
+      });
+
+      console.log('API response status:', response.status, response.statusText);
+
+      if (!response.ok) {
+        // Standard error messages based on status code
+        const errorStatusMessages: {[key: number]: string} = {
+          400: 'Bad request - please check your data',
+          401: 'Authentication failed - please log in again',
+          403: 'You do not have permission to submit results',
+          404: 'Quiz not found on server',
+          409: 'You have already taken this quiz',
+          500: 'Server error - please try again later'
+        };
+
+        // Try to get the response body for more details
+        const errorText = await response.text();
+        console.log('Raw error response:', errorText);
+
+        let errorData = { detail: errorStatusMessages[response.status] || 'Unknown error occurred' };
+
+        try {
+          // Only try to parse if there's actual content
+          if (errorText && errorText.trim() !== '' && errorText.includes('{')) {
+            errorData = JSON.parse(errorText);
+            console.log('Parsed error response:', errorData);
+          } else {
+            console.log('Non-JSON error response or empty response body');
+            // Use status-based message for empty responses
+            if (!errorData.detail && response.status in errorStatusMessages) {
+              errorData.detail = errorStatusMessages[response.status];
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+          errorData = {
+            detail: errorText || errorStatusMessages[response.status] || `Error ${response.status}: ${response.statusText}`
+          };
+        }
+
+        console.error('Error response:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: errorData
+        });
+
+        // Handle specific error cases
+        if (response.status === 401) {
+          console.error('Authentication failed. Token might be invalid or expired.');
+          setSaveError('Your session has expired. Please log in again to save your results.');
+        } else if (response.status === 400 && errorData.detail === "User has already taken this quiz") {
+          setSaveError("You've already taken this quiz before.");
+        } else if (response.status === 404) {
+          setSaveError("Quiz not found on the server.");
+        } else {
+          setSaveError(errorData.detail || 'Failed to save your results. Please try again.');
+        }
+
+        setIsSaving(false);
+        setSaveStatus('error');
+        return;
+      }
+
+      // Try to parse the successful response
+      const result = await response.json().catch(() => null);
+      console.log('Quiz result saved successfully:', result);
+
+      setSaveStatus('success');
+      setIsSaving(false);
+    } catch (error) {
+      console.error('Error in saveQuizResult:', error);
+      setSaveError('An unexpected error occurred. Please try again.');
+      setSaveStatus('error');
+      setIsSaving(false);
     }
   };
 
@@ -89,6 +243,34 @@ export default function QuizPage() {
                 </div>
                 <p className="text-sm text-gray-500 mt-2">{percentage}%</p>
               </div>
+
+              {/* Show result save status */}
+              {!token && (
+                <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-sm">
+                  <p className="text-yellow-700">Sign in to save your quiz results</p>
+                </div>
+              )}
+
+              {isSaving && (
+                <div className="mt-4 p-3 bg-emerald-50 rounded-lg">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin h-4 w-4 border-2 border-emerald-600 rounded-full border-t-transparent mr-2"></div>
+                    <p className="text-emerald-700 text-sm">Saving your results...</p>
+                  </div>
+                </div>
+              )}
+
+              {saveStatus === 'success' && (
+                <div className="mt-4 p-3 bg-emerald-50 rounded-lg">
+                  <p className="text-emerald-700 text-sm">✓ Your results have been saved!</p>
+                </div>
+              )}
+
+              {saveStatus === 'error' && (
+                <div className="mt-4 p-3 bg-red-50 rounded-lg">
+                  <p className="text-red-700 text-sm">{saveError}</p>
+                </div>
+              )}
             </div>
             <button
               onClick={() => {
@@ -96,6 +278,8 @@ export default function QuizPage() {
                 setSelectedAnswer(null);
                 setScore(0);
                 setShowResults(false);
+                setSaveStatus('idle');
+                setSaveError(null);
               }}
               className="w-full bg-emerald-600 text-white py-3 px-6 rounded-full hover:bg-emerald-700 transition-colors shadow-lg hover:shadow-emerald-200"
             >

@@ -3,6 +3,9 @@ from sqlalchemy.orm import Session
 from typing import List
 from .. import models, schemas
 from ..database import get_db
+from ..auth import get_current_user
+from sqlalchemy.sql import func
+from datetime import datetime, time
 
 router = APIRouter(
     prefix="/api/quizzes",
@@ -136,3 +139,57 @@ def create_quiz_with_questions(quiz_data: schemas.QuizWithQuestionsCreate, db: S
         "questions": db_questions,
         "total_questions": len(db_questions)
     }
+
+@router.post("/user-results", response_model=schemas.QuizResultResponse, status_code=status.HTTP_201_CREATED)
+def submit_quiz_result(
+    result: schemas.QuizResultCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Check if quiz exists
+    quiz = db.query(models.Quiz).filter(models.Quiz.id == result.quiz_id).first()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+
+    # Check if user has already taken this quiz
+    existing_result = db.query(models.QuizResult).filter(
+        models.QuizResult.user_id == current_user.id,
+        models.QuizResult.quiz_id == result.quiz_id
+    ).first()
+
+    if existing_result:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User has already taken this quiz"
+        )
+
+    # Create new quiz result with explicit created_at
+    db_result = models.QuizResult(
+        user_id=current_user.id,
+        quiz_id=result.quiz_id,
+        score=result.score,
+        correct_answers=result.correct_answers,
+        total_questions=result.total_questions
+    )
+
+    db.add(db_result)
+    db.commit()
+    db.refresh(db_result)
+
+    # Ensure created_at is a datetime object
+    if isinstance(db_result.created_at, time):
+        db_result.created_at = datetime.combine(datetime.now().date(), db_result.created_at)
+
+    return db_result
+
+@router.get("/user-results", response_model=List[schemas.QuizResultResponse])
+def get_user_quiz_results(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user)
+):
+    # Get all quiz results for the current user
+    results = db.query(models.QuizResult).filter(
+        models.QuizResult.user_id == current_user.id
+    ).all()
+
+    return results

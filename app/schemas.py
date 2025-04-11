@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Optional, List, ForwardRef
+from typing import Optional, List, ForwardRef, Any
 
 class UserBase(BaseModel):
     username: str
@@ -91,3 +91,31 @@ class CategorySamplesResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+# Add these quiz result schemas
+class QuizResultCreate(BaseModel):
+    quiz_id: int
+    score: float
+    correct_answers: int
+    total_questions: int
+
+class QuizResultResponse(BaseModel):
+    id: int
+    user_id: int
+    quiz_id: int
+    score: float
+    correct_answers: int
+    total_questions: int
+    created_at: datetime
+
+    model_config = {
+        "from_attributes": True
+    }
+
+class QuizResultsListResponse(BaseModel):
+    results: List[QuizResultResponse]
+    total: int
+
+    model_config = {
+        "from_attributes": True
+    }
