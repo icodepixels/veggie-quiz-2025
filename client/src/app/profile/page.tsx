@@ -1,12 +1,14 @@
 'use client';
 
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { RootState } from '../../store/store';
+import { RootState, AppDispatch } from '../../store/store';
+import { logout } from '../../store/slices/authSlice';
 
 export default function Profile() {
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const { user, token } = useSelector((state: RootState) => state.auth);
   const [mounted, setMounted] = useState(false);
 
@@ -16,6 +18,11 @@ export default function Profile() {
       router.push('/signin');
     }
   }, [token, router]);
+
+  const handleSignOut = () => {
+    dispatch(logout());
+    router.push('/');
+  };
 
   if (!mounted || !token) {
     return null;
@@ -67,6 +74,15 @@ export default function Profile() {
                     </dd>
                   </div>
                 </div>
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <button
+                  onClick={handleSignOut}
+                  className="px-6 py-3 rounded-md text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 transition-colors"
+                >
+                  Sign out
+                </button>
               </div>
             </div>
           </div>
