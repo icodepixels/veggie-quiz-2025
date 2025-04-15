@@ -159,7 +159,7 @@ def submit_quiz_result(
 
     if existing_result:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="User has already taken this quiz"
         )
 

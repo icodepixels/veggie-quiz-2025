@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '@/store/store';
 import { fetchQuizById } from '../../../store/slices/quizzesSlice';
+import { signIn, signUp } from '../../../store/slices/authSlice';
+import AuthModal from '@/components/AuthModal';
 
 export default function QuizPage() {
   const params = useParams();
@@ -19,12 +21,23 @@ export default function QuizPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (quizId) {
       dispatch(fetchQuizById(quizId));
     }
   }, [dispatch, quizId]);
+
+  useEffect(() => {
+    // Show auth modal if user completes quiz but isn't signed in
+    if (showResults && !token) {
+      setShowAuthModal(true);
+    }
+  }, [showResults, token]);
 
   const handleAnswerSelect = (index: number) => {
     setSelectedAnswer(index);
@@ -56,13 +69,101 @@ export default function QuizPage() {
     }
   };
 
-  const saveQuizResult = async (finalScore: number, totalQuestions: number) => {
+  const handleSignIn = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email || !email.includes('@')) {
+      setAuthError('Please enter a valid email address');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setAuthError(null);
+
+      try {
+        // First attempt to sign in
+        const result = await dispatch(signIn(email)).unwrap();
+
+        if (result && result.token) {
+          // Instead of saving immediately, wait for Redux state to update with token
+          setTimeout(() => {
+            // Get fresh token from Redux store after login
+            const currentToken = localStorage.getItem('auth')
+              ? JSON.parse(localStorage.getItem('auth') || '{}').token
+              : null;
+
+            if (currentToken) {
+              // Successfully signed in and token is available, now save quiz result
+              if (currentQuiz) {
+                saveQuizResult(score, currentQuiz.questions.length, currentToken);
+              }
+            } else {
+              console.error('Token not available after sign in');
+              setAuthError('Authentication succeeded but token is not available. Please try again.');
+            }
+            setShowAuthModal(false);
+          }, 500); // Give Redux a moment to update the store
+        }
+      } catch (error: unknown) {
+        if (error instanceof Error && error.message.includes('401')) {
+          console.log('Sign-in failed with 401, attempting to sign up');
+
+          try {
+            // Extract username from email (everything before @)
+            const username = email.split('@')[0];
+
+            // Call sign up with username and email
+            await dispatch(signUp({ username, email })).unwrap();
+
+            // If signup succeeds, try signing in again
+            const signInResult = await dispatch(signIn(email)).unwrap();
+
+            if (signInResult && signInResult.token) {
+              setTimeout(() => {
+                const currentToken = localStorage.getItem('auth')
+                  ? JSON.parse(localStorage.getItem('auth') || '{}').token
+                  : null;
+
+                if (currentToken) {
+                  if (currentQuiz) {
+                    saveQuizResult(score, currentQuiz.questions.length, currentToken);
+                  }
+                } else {
+                  console.error('Token not available after sign up and sign in');
+                  setAuthError('Account created but authentication failed. Please try again.');
+                }
+                setShowAuthModal(false);
+              }, 500);
+            }
+          } catch (signUpError) {
+            console.error('Sign up error:', signUpError);
+            setAuthError('Failed to create an account. The username might already be taken.');
+          }
+        } else {
+          // Handle other errors
+          console.error('Authentication error:', error);
+          setAuthError('Failed to authenticate. Please try again.');
+        }
+      }
+    } catch (error) {
+      console.error('Unexpected error in authentication flow:', error);
+      setAuthError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [email, currentQuiz, score, dispatch]);
+
+  const saveQuizResult = async (finalScore: number, totalQuestions: number, overrideToken?: string) => {
     try {
       setIsSaving(true);
       setSaveStatus('idle');
       setSaveError(null);
 
-      if (!token) {
+      // Use provided token override or fall back to Redux store token
+      const authToken = overrideToken || token;
+
+      if (!authToken) {
         console.error('No token available for API request');
         setSaveError('You must be logged in to save your results');
         setIsSaving(false);
@@ -104,7 +205,7 @@ export default function QuizPage() {
       console.log('Request payload:', payload);
       console.log('Request headers:', {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer [TOKEN HIDDEN]'
+        'Authorization': `Bearer ${authToken.substring(0, 10)}...`
       });
 
       // Send result to API
@@ -112,7 +213,7 @@ export default function QuizPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify(payload),
         credentials: 'include'
@@ -166,7 +267,7 @@ export default function QuizPage() {
         if (response.status === 401) {
           console.error('Authentication failed. Token might be invalid or expired.');
           setSaveError('Your session has expired. Please log in again to save your results.');
-        } else if (response.status === 400 && errorData.detail === "User has already taken this quiz") {
+        } else if (response.status === 409) {
           setSaveError("You've already taken this quiz before.");
         } else if (response.status === 404) {
           setSaveError("Quiz not found on the server.");
@@ -245,7 +346,7 @@ export default function QuizPage() {
               </div>
 
               {/* Show result save status */}
-              {!token && (
+              {!token && !showAuthModal && (
                 <div className="mt-4 p-3 bg-yellow-50 rounded-lg text-sm">
                   <p className="text-yellow-700">Sign in to save your quiz results</p>
                 </div>
@@ -287,6 +388,17 @@ export default function QuizPage() {
             </button>
           </div>
         </div>
+
+        {/* Render auth modal if showing results and not signed in */}
+        {showAuthModal &&
+          <AuthModal
+            initialEmail={email}
+            onEmailChange={setEmail}
+            authError={authError}
+            isSubmitting={isSubmitting}
+            handleSignIn={handleSignIn}
+          />
+        }
       </div>
     );
   }

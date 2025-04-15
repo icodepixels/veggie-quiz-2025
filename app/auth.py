@@ -11,7 +11,7 @@ from .database import get_db
 # Change these in production!
 SECRET_KEY = "your-secret-key-here"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 525600  # 1 year in minutes (365 days * 24 hours * 60 minutes)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
