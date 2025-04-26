@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  images: {
+    domains: ['veggie-quiz-2025-production.up.railway.app'],
+  },
 };
 
 export default nextConfig;

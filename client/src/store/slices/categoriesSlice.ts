@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { RootState } from '../store';
+import { API_BASE_URL } from '@/config';
 
 interface CategoriesState {
   categories: string[];
@@ -16,7 +17,7 @@ const initialState: CategoriesState = {
 export const fetchCategories = createAsyncThunk(
   'categories/fetchCategories',
   async () => {
-    const response = await fetch('http://localhost:8000/api/quizzes/categories');
+    const response = await fetch(`${API_BASE_URL}/api/quizzes/categories`);
     if (!response.ok) {
       throw new Error('Failed to fetch categories');
     }
